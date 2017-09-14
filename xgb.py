@@ -21,9 +21,9 @@ df_all['Gene_Share'] = df_all.apply(lambda r: sum([1 for w in r['Gene'].split(' 
 df_all['Variation_Share'] = df_all.apply(lambda r: sum([1 for w in r['Variation'].split(' ') if w in r['Text'].split(' ')]), axis=1)
 
 #commented for Kaggle Limits
-#for i in range(56):
-#    df_all['Gene_'+str(i)] = df_all['Gene'].map(lambda x: str(x[i]) if len(x)>i else '')
-#    df_all['Variation'+str(i)] = df_all['Variation'].map(lambda x: str(x[i]) if len(x)>i else '')
+for i in range(56):
+   df_all['Gene_'+str(i)] = df_all['Gene'].map(lambda x: str(x[i]) if len(x)>i else '')
+   df_all['Variation'+str(i)] = df_all['Variation'].map(lambda x: str(x[i]) if len(x)>i else '')
 
 
 gen_var_lst = sorted(list(train.Gene.unique()) + list(train.Variation.unique()))
@@ -32,10 +32,10 @@ gen_var_lst = [x for x in gen_var_lst if len(x.split(' '))==1]
 print(len(gen_var_lst))
 i_ = 0
 #commented for Kaggle Limits
-#for gen_var_lst_itm in gen_var_lst:
-#    if i_ % 100 == 0: print(i_)
-#    df_all['GV_'+str(gen_var_lst_itm)] = df_all['Text'].map(lambda x: str(x).count(str(gen_var_lst_itm)))
-#    i_ += 1
+for gen_var_lst_itm in gen_var_lst:
+   if i_ % 100 == 0: print(i_)
+   df_all['GV_'+str(gen_var_lst_itm)] = df_all['Text'].map(lambda x: str(x).count(str(gen_var_lst_itm)))
+   i_ += 1
 
 for c in df_all.columns:
     if df_all[c].dtype == 'object':
@@ -78,7 +78,7 @@ fp = pipeline.Pipeline([
             ('pi1', pipeline.Pipeline([('Gene', cust_txt_col('Gene')), ('count_Gene', feature_extraction.text.CountVectorizer(analyzer=u'char', ngram_range=(1, 8))), ('tsvd1', decomposition.TruncatedSVD(n_components=20, n_iter=25, random_state=12))])),
             ('pi2', pipeline.Pipeline([('Variation', cust_txt_col('Variation')), ('count_Variation', feature_extraction.text.CountVectorizer(analyzer=u'char', ngram_range=(1, 8))), ('tsvd2', decomposition.TruncatedSVD(n_components=20, n_iter=25, random_state=12))])),
             #commented for Kaggle Limits
-            #('pi3', pipeline.Pipeline([('Text', cust_txt_col('Text')), ('tfidf_Text', feature_extraction.text.TfidfVectorizer(ngram_range=(1, 2))), ('tsvd3', decomposition.TruncatedSVD(n_components=50, n_iter=25, random_state=12))]))
+            ('pi3', pipeline.Pipeline([('Text', cust_txt_col('Text')), ('tfidf_Text', feature_extraction.text.TfidfVectorizer(ngram_range=(1, 2))), ('tsvd3', decomposition.TruncatedSVD(n_components=50, n_iter=25, random_state=12))]))
         ])
     )])
 
