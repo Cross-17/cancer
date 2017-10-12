@@ -1,0 +1,61 @@
+---
+title: "cancerEDA.rmd"
+output: html_notebook
+---
+# 1.1 Load libraries and data files
+```{r}
+knitr::opts_chunk$set(echo = TRUE)
+
+library('ggplot2') # visualization
+library('ggthemes') # visualization
+library('scales') # visualization
+library('grid') # visualisation
+library('gridExtra') # visualisation
+library('corrplot') # visualisation
+library('ggfortify') # visualisation
+library('ggraph') # visualisation
+library('igraph') # visualisation
+library('dplyr') # data manipulation
+library('readr') # data input
+library('tibble') # data wrangling
+library('tidyr') # data wrangling
+library('stringr') # string manipulation
+library('forcats') # factor manipulation
+library('tidytext') # text mining
+library('SnowballC') # text analysis
+library('wordcloud') # test visualisation
+```
+
+Reading in the variants data tables:
+
+```{r}
+train <- read_csv('input/training_variants')
+test  <- read_csv('input/test_variants')
+```
+
+Reading in the text files currently takes a bit more effort in R. The previous read-in method didn¡¯t work properly. Use this one instead:
+
+```{r}
+train_txt_dump <- tibble(text = read_lines('input/training_text', skip = 1))
+train_txt <- train_txt_dump %>%
+  separate(text, into = c("ID", "txt"), sep = "\\|\\|")
+train_txt <- train_txt %>%
+  mutate(ID = as.integer(ID))
+
+test_txt_dump <- tibble(text = read_lines('../input/test_text', skip = 1))
+test_txt <- test_txt_dump %>%
+  separate(text, into = c("ID", "txt"), sep = "\\|\\|")
+test_txt <- test_txt %>%
+  mutate(ID = as.integer(ID))
+
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
