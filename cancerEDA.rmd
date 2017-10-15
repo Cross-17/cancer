@@ -1,12 +1,12 @@
 ---
-title: "cancerEDA.rmd"
+title: "cancerEDA"
 output:
   html_document: default
   html_notebook: default
   pdf_document: default
 ---
 # 1.1 Load libraries and data files
-```{r results='hide'}
+```{r warning = FALSE,message = FALSE}
 
 library('ggplot2') # visualization
 library('ggthemes') # visualization
@@ -30,7 +30,7 @@ library('wordcloud') # test visualisation
 
 Reading in the variants data tables:
 
-```{r results='hide'}
+```{r message = FALSE }
 train <- read_csv('input/training_variants')
 test  <- read_csv('input/test_variants')
 ```
