@@ -191,10 +191,10 @@ We find:
 *Level 7 is clearly the most frequent one
 
 
-# 2.3 Feature interactions
+## 2.3 Feature interactions
 Now we want to examine how the features interact with each other and with the target Class variable.
 
-# 2.3.1 Gene vs Class
+### 2.3.1 Gene vs Class
 
 First, we will look at the frequency distribution of the overall most frequent Genes for the different Classes. Note the logarithmic frequency scale.
 
@@ -225,4 +225,220 @@ train %>%
   geom_bar() +
   scale_y_log10() +
   facet_wrap(~ Gene)
+```
+This representation underlines our findings about the similar/dominating Genes in different Classes.
+
+### 2.3.2 Gene vs Variation
+
+Next, we are somewhat repurposing a count plot to visualise how the Variations are distributed for the most frequent Genes. Since there are so many different variations we drop the y-axis labels and merely illustrate how many Gene - Variation combinations exist in the data.
+
+First the training data:
+
+```{r}
+foo <- train %>%
+  filter(Gene %in% str_c(top_gene$Gene)) %>%
+  group_by(Gene, Variation) %>%
+  summarise(ct = n())
+
+y_labels <- str_sub(foo$Variation, start = 1, end = 5)
+  
+foo %>%
+  ggplot(aes(reorder(Gene, ct, FUN = median), reorder(Variation, ct, FUN = median))) +
+  geom_count() +
+  labs(x = "Gene", y = "Variation") +
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5, size=7),
+        axis.ticks = element_blank(), axis.text.y = element_blank(),
+        legend.position = "none")
+```
+
+Then the test data:
+
+```{r}
+foo <- test %>%
+  filter(Gene %in% str_c(top_gene$Gene)) %>%
+  group_by(Gene, Variation) %>%
+  summarise(ct = n())
+
+y_labels <- str_sub(foo$Variation, start = 1, end = 5)
+  
+foo %>%
+  ggplot(aes(reorder(Gene, ct, FUN = median), reorder(Variation, ct, FUN = median))) +
+  geom_count() +
+  labs(x = "Gene", y = "Variation") +
+  theme(axis.text.x  = element_text(angle=90, vjust=0.5, size=7),
+        axis.ticks = element_blank(), axis.text.y = element_blank(),
+        legend.position = "none")
+```
+
+Once more, the two data sets are rather heterogeneous in this view.
+
+# 3 The text files
+
+## 3.1 Overview
+The second kind of data files contain a whole lot of text from what looks like scientific papers or proceedings. Here is the beginning of the first entry:
+
+```{r}
+str_sub(train_txt$txt[1], start = 1, end = 1e3)
+```
+
+Sure enough, we can easily confirm that the first part of the complete entry corresponds to [this paper](https://www.ncbi.nlm.nih.gov/labs/pubmed/24218572-cdk10cyclin-m-is-a-protein-kinase-that-controls-ets2-degradation-and-is-deficient-in-star-syndrome/) and later switches to [this one](https://www.nature.com/ng/journal/v40/n3/pdf/ng.86.pdf?origin=ppub&foxtrotcallback=true) (and maybe other related ones.) Therefore, this data file appears to be a data dump of the complete publication texts for the papers that the classification was based on (including figure captions, manuscript structure, and sometimes affiliations).
+
+I¡¯m suspecting that a little domain knowledge will go a long way here in determining which keywords are important and which ones aren¡¯t. This will be an interesting excercise to see how clearly information is communicated in scientific publications.
+
+## 3.2 On data cleaning and preparations
+
+Here I want to collect various text features, artefacts, and global properties that I noticed during this initial exploration. This list will likely expand as the kernel grows.
+
+*  **Scientific terminology and stop words**: Most scientific papers have a common style of language that will be reasonably homogeneous throughout the text files. Words like ¡°result¡± or ¡°discuss¡± will be frequent without necessarily containing any signal for our prediction goal. Therefore, below I define my own list of additional stop words.
+
+*  **Research field related stop words**: My impression is that the list of stop words could be extended by including characteristic terms of the overall research field that are so ubiquitous that their high frequency may mask genuinely interesting terms. Words such as ¡°mutation¡±, ¡°cancer¡±, or ¡°tumor¡± appear to be too general to have much distinguishing power here. The TF-IDF below seems to confirm this. It would be interesting to get some feedback from people with domain knowledge about which other terms could a-priori be removed from the text.
+
+* **Paper notation quirks**: Converting the paper text straight to ascii leads to a number of artefacts. None of those will have a big impact individually, but together they might reduce the accuracy of the analysis:
+* Citation numbers (as used e.g. by Nature magazine) are attached to the corresponding word
+* Occasionally, there are what seems like webpage navigation commands like ¡°SectionNext¡± embedden in the text
+* Author names and affiliations are occasionally included
+
+## 3.3 Feature Engineering
+
+###3.3.1 Text length - txt_len
+```{r}
+train_txt <- train_txt %>%
+  mutate(txt_len = str_length(txt),
+         set = "train")
+
+test_txt <- test_txt %>%
+  mutate(txt_len = str_length(txt),
+         set = "test")
+
+combine_txt <- full_join(train_txt,test_txt)
+```
+For an early exploration we can look at the distribution of the length of the text features. A priori, I wouldn¡¯t expect the length of a paper to be related to the classification outcome; but maybe some classifications require only a single paper while for others it¡¯s necessary to check multiple ones.
+
+First, here is the overall distribution of the text entry lengths in train vs test:
+```{r}
+combine_txt %>%
+  ggplot(aes(txt_len, fill = set)) +
+#  geom_density(alpha = 0.5, bw = 5e3) +
+  geom_histogram(bins = 50) +
+  labs(x = "Length of text entry")
+```
+
+The difference in distribution shape might again be due to the machine-generated entries that have been added to the test sample.
+
+Now, let¡¯s see whether this distribution changes for the different target Classes. First, a facet wrap comparison:
+
+```{r}
+foo <- train_txt %>%
+  select(ID, txt_len)
+bar <- train %>%
+  select(ID, Class)
+
+full_join(foo, bar, by = "ID") %>%
+  ggplot(aes(txt_len)) +
+  geom_density(fill = "red", bw = 5e3) +
+  labs(x = "Length of text entry") +
+  facet_wrap(~ Class)
+```
+
+Then an overlay of empirical cumulative density functions:
+```{r}
+foo <- train_txt %>%
+  select(ID, txt_len)
+bar <- train %>%
+  select(ID, Class)
+
+full_join(foo, bar, by = "ID") %>%
+  ggplot(aes(txt_len)) +
+  stat_ecdf(geom = "step") +
+  stat_ecdf(aes(txt_len, color = Class), geom = "step") +
+  labs(x = "Length of text entry")
+```
+
+And the median lengths for each class:
+```{r}
+foo <- train_txt %>%
+  select(ID, txt_len)
+bar <- train %>%
+  select(ID, Class)
+
+full_join(foo, bar, by = "ID") %>%
+  group_by(Class) %>%
+  summarise(l_med = median(txt_len))
+```
+We find:
+
+* There appear to be significant differences in the shape and median of the test length distributions. Classes 8 and 9 require on average more text, whereas Class 3 has the shortest/fewest papers associated with it.
+
+* For what it¡¯s worth, it is tempting to speculate that the apparent multiple peaks in the text length distributions of the individual Classes could correspond to the number of papers that make up the clinical evidence.
+
+### 3.3.2 Missing text values
+
+In the discussion it was [pointed out](https://www.kaggle.com/c/msk-redefining-cancer-treatment/discussion/35621) that a few observations have a ¡°null¡± entry in their text features. Using our txt_len feature we can confirm this finding and easily show that there are no other text values with less than 100 characters (just in case a different Null indicator would have been used):
+```{r}
+combine_txt %>%
+  filter(txt_len < 100)
+```
+
+### 3.3.3 Keyword frequency - pedestrian approach
+
+I want to use this competition to learn more about text mining. While I dive deeper into the applications of the various tools and techniques I will document here what I have learnt. If you are a beginner like me, then maybe this approach will be useful for you. If you are an expert then feel free to skip all the entry-level information (and maybe let me know if I get something seriously wrong.)
+
+Before getting started with specialised tools, here is a first approach based on standard string manipulation methods.
+
+An obvious first step in analysing the content of the clinical evidence is to look how often certain keywords are mentioned in the text of the corresponding papers.
+
+We choose the two words ¡°pathogenic¡± and ¡°benign¡± that are used in the naming of the 5 categories in [this overview paper](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC4544753/). Here we extract their frequency of occurence per observation:
+
+```{r}
+train_txt <- train_txt %>%
+  mutate(f_pathogenic = str_count(txt, "pathogenic"),
+         f_benign = str_count(txt, "benign")
+         )
+```
+Those are the frequency distributions of the word ¡°pathogenic¡± for our 9 classes (note the logarithmic y-axes):
+```{r}
+foo <- train_txt %>%
+  select(ID, f_benign, f_pathogenic)
+bar <- train %>%
+  select(ID, Class)
+
+full_join(foo, bar, by = "ID") %>%
+  ggplot(aes(f_pathogenic)) +
+  geom_bar() +
+  scale_y_log10() +
+  facet_wrap(~ Class)
+```
+And here we plot the ratio of the mean occurence per class of the word ¡°pathogenic¡± over the mean occurence of the word ¡°benign¡±:
+```{r}
+foo <- train_txt %>%
+  select(ID, f_benign, f_pathogenic)
+bar <- train %>%
+  select(ID, Class)
+
+full_join(foo, bar, by = "ID") %>%
+  group_by(Class) %>%
+  summarise(mean_benign = mean(f_benign),
+            mean_pathogenic = mean(f_pathogenic),
+            path_ben = mean(f_pathogenic)/mean(f_benign)) %>%
+  ggplot(aes(reorder(Class, -path_ben, FUN = max), path_ben)) +
+  geom_point(colour = "red", size = 3) +
+  labs(x = "Class", y = "# occurences 'pathogenic' / # occurences 'benign'")
+```
+We find:
+
+* The facet plot shows that the word ¡°pathogenic¡± is clearly more frequent in certain Classes such as 1, 4, or 5
+
+* The ratio plot confirms this impression and suggests two distinct groups of Classes: 2, 7, 8, 9 vs 1, 3, 4. The latter have on average a higher ratio of mentions of ¡°pathogenic¡± over ¡°benign¡± than the former. In addition, Classes 5 and 6 have an even higher ratio of ¡°pathogenic¡± over ¡°benign¡±.
+
+Of course, some of these occurences could have said ¡°not pathogenic¡± or ¡°not benign¡±, which is why we will need to dive further into text analysis to tackle this puzzle.
+
+## 3.4 First steps into text analysis with tidytext
+
+As the authors of the tidytext package put it: The tidy text format is being defined as a table with one token per row; with a token being a word or another meaningful unit of text (paraphrased). Through tidy text we can use the powerful tools of the tidyverse to process and analyse text files. I will follow [this excellent and free online book](http://tidytextmining.com/).
+
+In order to get our text data in a tidy shape, we use the unnest_tokens tool. This also gets rid of punctuation and converts everything to lowercase:
+
+```{r}
+t1 <- train_txt %>% select(ID, txt) %>% unnest_tokens(word, txt)
+head(t1)
 ```
